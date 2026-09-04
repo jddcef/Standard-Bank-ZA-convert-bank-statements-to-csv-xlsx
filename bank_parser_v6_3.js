@@ -69,7 +69,7 @@ const elements = {
     tabs: () => document.querySelectorAll('.tab-btn')
 };
 
-const valPattern = /(-?[\d,.]+[.,]\d{2}-?)\s+(\d{2}\s+\d{2})\s+(-?[\d,.]+[.,]\d{2}-?)/;
+const valPattern = /(-?[\d\s.,]+[.,]\d{2}-?)\s+(\d{2}\s+\d{2})\s+(-?[\d\s.,]+[.,]\d{2}-?)/;
 
 function init() {
     const savedJunk = localStorage.getItem('bankflow_v63_junk');
@@ -302,13 +302,35 @@ function cleanDetails(d) {
 }
 
 function cleanNum(v) {
-    let n = v.replace(/\s/g, '');
-    let neg = n.endsWith('-') || n.startsWith('-');
-    n = n.replace(/[^\d.,]/g, '');
-    if (n.length >= 3 && (n[n.length-3] === '.' || n[n.length-3] === ',')) {
-        const int = n.slice(0,-3).replace(/[^\d]/g, '');
-        n = `${int}.${n.slice(-2)}`;
-    } else n = n.replace(/[^\d]/g, '');
+    if (v === null || v === undefined) return '';
+
+    let n = String(v).replace(/\s+/g, '');
+    const neg = n.startsWith('-') || n.endsWith('-');
+    n = n.replace(/[^\d,.-]/g, '').replace(/-/g, '');
+    if (!n) return '';
+
+    if (n.includes(',') && n.includes('.')) {
+        const lastComma = n.lastIndexOf(',');
+        const lastDot = n.lastIndexOf('.');
+        const decimalSep = lastComma > lastDot ? ',' : '.';
+        const groupSep = decimalSep === ',' ? '.' : ',';
+        n = n.replace(new RegExp(escapeRegExp(groupSep), 'g'), '').replace(decimalSep, '.');
+    } else if (n.includes(',')) {
+        const lastComma = n.lastIndexOf(',');
+        const fractionDigits = n.slice(lastComma + 1).length;
+        if (fractionDigits === 2 && lastComma > 0) {
+            n = n.replace(/,/g, '.');
+        } else {
+            n = n.replace(/,/g, '');
+        }
+    } else if (n.includes('.')) {
+        const parts = n.split('.');
+        if (parts.length > 2) {
+            const fraction = parts.pop();
+            n = `${parts.join('')}.${fraction}`;
+        }
+    }
+
     return (neg ? '-' : '') + n;
 }
 
