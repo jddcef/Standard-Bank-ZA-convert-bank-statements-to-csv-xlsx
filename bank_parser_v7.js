@@ -30,6 +30,8 @@ let appState = {
     filters: { keyword: true, regex: true, strict: false, sanity: true },
     splitMethod: "center",
     splitX: 297.5,
+    splitCode: false,
+    lastTotalErrors: 0,
     masterTransactions: [],
     masterExclusions: [],
     lastPdfPassword: '',
@@ -114,6 +116,7 @@ const elements = {
     fileInput: () => document.getElementById('fileInput'),
     resultsArea: () => document.getElementById('resultsArea'),
     txnTable: () => document.getElementById('txnTable').querySelector('tbody'),
+    txnTableHead: () => document.getElementById('txnTable').querySelector('thead'),
     rawOutput: () => document.getElementById('rawOutput'),
     exclusionTable: () => document.getElementById('exclusionTable').querySelector('tbody'),
     dashboard: () => document.getElementById('dashboard'),
@@ -141,6 +144,7 @@ const elements = {
     splitMethodSelect: () => document.getElementById('splitMethodSelect'),
     splitXInput: () => document.getElementById('splitXInput'),
     customXContainer: () => document.getElementById('customXContainer'),
+    startOverButtons: () => document.querySelectorAll('.btn-start-over'),
     passwordModal: () => document.getElementById('passwordModal'),
     passwordForm: () => document.getElementById('passwordForm'),
     passwordMessage: () => document.getElementById('passwordMessage'),
@@ -302,6 +306,9 @@ function init() {
     appState.splitMethod = savedSplitMethod;
     appState.splitX = parseFloat(savedSplitX);
     
+    const savedSplitCode = localStorage.getItem('bankflow_v7_split_code');
+    appState.splitCode = savedSplitCode === 'true'; // default false
+    
     elements.splitMethodSelect().value = appState.splitMethod;
     elements.splitXInput().value = appState.splitX;
     elements.customXContainer().style.display = appState.splitMethod === 'custom' ? 'block' : 'none';
@@ -405,6 +412,76 @@ function setupEvents() {
             settlePasswordPrompt(password);
         };
     }
+
+    setupStartOver();
+}
+
+function setupStartOver() {
+    const startOverButtons = elements.startOverButtons ? elements.startOverButtons() : document.querySelectorAll('.btn-start-over');
+    if (!startOverButtons || !startOverButtons.length) return;
+
+    let confirmTimer = null;
+    let isConfirming = false;
+
+    function resetConfirm() {
+        if (confirmTimer) {
+            clearTimeout(confirmTimer);
+            confirmTimer = null;
+        }
+        isConfirming = false;
+        startOverButtons.forEach(btn => {
+            btn.classList.remove('confirming');
+            btn.innerHTML = '<i data-lucide="rotate-ccw"></i> Start Over';
+        });
+        refreshIcons();
+    }
+
+    startOverButtons.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (isConfirming) {
+                if (confirmTimer) clearTimeout(confirmTimer);
+                startOverButtons.forEach(b => {
+                    b.innerHTML = '<i data-lucide="refresh-cw"></i> Resetting...';
+                });
+                refreshIcons();
+                try {
+                    sessionStorage.clear();
+                } catch (_) {}
+                window.location.reload();
+            } else {
+                isConfirming = true;
+                startOverButtons.forEach(b => {
+                    b.classList.add('confirming');
+                    b.innerHTML = '<i data-lucide="alert-triangle"></i> Press again to confirm';
+                });
+                refreshIcons();
+
+                confirmTimer = setTimeout(() => {
+                    resetConfirm();
+                }, 4000);
+            }
+        };
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!isConfirming) return;
+        let clickedInside = false;
+        startOverButtons.forEach(btn => {
+            if (btn.contains(e.target)) clickedInside = true;
+        });
+        if (!clickedInside) {
+            resetConfirm();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isConfirming) {
+            resetConfirm();
+        }
+    });
 }
 
 function requestPdfPassword(filename, incorrectPassword = false) {
@@ -1058,7 +1135,7 @@ function parseCcDate(dateStr) {
     return { dateDisplay: dateStr, year: null };
 }
 
-function splitDetails(detailsStr) {
+function splitDetails(detailsStr, splitCode = false) {
     const parts = (detailsStr || "").split(" | ").map(p => p.trim());
     let mainDetails = parts[0] || "";
     
@@ -1071,12 +1148,73 @@ function splitDetails(detailsStr) {
     }
     
     const details3 = parts.slice(1).join(" | ") || "";
-    return { details1, details2, details3 };
+    
+    if (splitCode) {
+        return { details1, details2, details3 };
+    } else {
+        return { details1: mainDetails, details2: "", details3 };
+    }
 }
 
 function renderAll(totalErrors) {
     try {
-        // 1. Master Table
+        appState.lastTotalErrors = totalErrors;
+
+        // 1. Update Table Header based on splitCode state
+        const thead = elements.txnTableHead ? elements.txnTableHead() : document.querySelector('#txnTable thead');
+        if (thead) {
+            if (appState.splitCode) {
+                thead.innerHTML = `
+                    <tr>
+                        <th style="width: 80px;">Date</th>
+                        <th style="width: 60px;">Year</th>
+                        <th style="min-width: 150px;">Details 1 (Type)</th>
+                        <th style="min-width: 130px;">
+                            <span>Details 2 (Code)</span>
+                            <button type="button" id="btnToggleCodeSplit" class="btn-split-toggle" title="Click to merge Code into Details 1">
+                                <i data-lucide="fold-horizontal" style="width:12px;height:12px;"></i> Merge Code
+                            </button>
+                        </th>
+                        <th style="min-width: 150px;">Details 3 (Additional)</th>
+                        <th style="width: 120px;">Category</th>
+                        <th class="text-right" style="width: 100px;">Amount</th>
+                        <th class="text-right" style="width: 120px;">Balance</th>
+                        <th style="width: 130px;">Source</th>
+                        <th style="width: 60px;">Math</th>
+                    </tr>
+                `;
+            } else {
+                thead.innerHTML = `
+                    <tr>
+                        <th style="width: 80px;">Date</th>
+                        <th style="width: 60px;">Year</th>
+                        <th style="min-width: 200px;">
+                            <span>Details 1 (Type)</span>
+                            <button type="button" id="btnToggleCodeSplit" class="btn-split-toggle" title="Click to split 4-digit code into a separate column">
+                                <i data-lucide="columns" style="width:12px;height:12px;"></i> Split Code
+                            </button>
+                        </th>
+                        <th style="min-width: 180px;">Details 2 (Additional)</th>
+                        <th style="width: 120px;">Category</th>
+                        <th class="text-right" style="width: 100px;">Amount</th>
+                        <th class="text-right" style="width: 120px;">Balance</th>
+                        <th style="width: 130px;">Source</th>
+                        <th style="width: 60px;">Math</th>
+                    </tr>
+                `;
+            }
+
+            const btnToggle = document.getElementById('btnToggleCodeSplit');
+            if (btnToggle) {
+                btnToggle.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.toggleCodeSplit();
+                };
+            }
+        }
+
+        // 2. Master Table Body
         const table = elements.txnTable();
         table.innerHTML = '';
         let lastSource = null;
@@ -1088,23 +1226,38 @@ function renderAll(totalErrors) {
                 lastSource = t.source;
             }
             const amtCls = parseFloat(t.amount) < 0 ? 'text-danger' : 'text-success';
-            const { details1, details2, details3 } = splitDetails(t.details);
-            row.innerHTML = `
-                <td>${t.date}</td>
-                <td>${t.year || ""}</td>
-                <td class="wrap">${details1}</td>
-                <td class="wrap">${details2}</td>
-                <td class="wrap">${details3}</td>
-                <td><span class="badge" style="background:rgba(56,189,248,0.1); color:var(--accent-color);">${t.category}</span></td>
-                <td class="text-right ${amtCls}">${parseFloat(t.amount).toFixed(2)}</td>
-                <td class="text-right">${parseFloat(t.balance).toFixed(2)}</td>
-                <td style="color:var(--text-secondary); font-size:0.65rem;">${t.source}</td>
-                <td><div class="sanity-dot sanity-${t.sanity}"></div> ${t.sanity === 'err' ? '<span class="math-note">'+t.math+'</span>' : ''}</td>
-            `;
+            const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
+            
+            if (appState.splitCode) {
+                row.innerHTML = `
+                    <td>${t.date}</td>
+                    <td>${t.year || ""}</td>
+                    <td class="wrap">${details1}</td>
+                    <td class="wrap">${details2}</td>
+                    <td class="wrap">${details3}</td>
+                    <td><span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe;">${t.category}</span></td>
+                    <td class="text-right ${amtCls}">${parseFloat(t.amount).toFixed(2)}</td>
+                    <td class="text-right">${parseFloat(t.balance).toFixed(2)}</td>
+                    <td style="color:var(--text-secondary); font-size:0.65rem;">${t.source}</td>
+                    <td><div class="sanity-dot sanity-${t.sanity}"></div> ${t.sanity === 'err' ? '<span class="math-note">'+t.math+'</span>' : ''}</td>
+                `;
+            } else {
+                row.innerHTML = `
+                    <td>${t.date}</td>
+                    <td>${t.year || ""}</td>
+                    <td class="wrap">${details1}</td>
+                    <td class="wrap">${details3}</td>
+                    <td><span class="badge" style="background:#eff6ff; color:#1d4ed8; border:1px solid #dbeafe;">${t.category}</span></td>
+                    <td class="text-right ${amtCls}">${parseFloat(t.amount).toFixed(2)}</td>
+                    <td class="text-right">${parseFloat(t.balance).toFixed(2)}</td>
+                    <td style="color:var(--text-secondary); font-size:0.65rem;">${t.source}</td>
+                    <td><div class="sanity-dot sanity-${t.sanity}"></div> ${t.sanity === 'err' ? '<span class="math-note">'+t.math+'</span>' : ''}</td>
+                `;
+            }
             table.appendChild(row);
         });
 
-        // 2. Dashboard
+        // 3. Dashboard
         elements.fileCount().textContent = appState.batchData.length;
         elements.txnCount().textContent = appState.masterTransactions.length;
         elements.batchStatus().innerHTML = totalErrors > 0 
@@ -1144,7 +1297,7 @@ function renderAll(totalErrors) {
             dashboard.appendChild(item);
         });
 
-        // 3. Raw Feed
+        // 4. Raw Feed
         const raw = elements.rawOutput();
         raw.innerHTML = '';
         appState.batchData.forEach(file => {
@@ -1155,12 +1308,12 @@ function renderAll(totalErrors) {
             file.rawLines.forEach((l, i) => {
                 const lineDiv = document.createElement('div');
                 lineDiv.className = `raw-line ${l.type}`;
-                lineDiv.innerHTML = `<span style="color:#475569; width:40px;">${i+1}</span>${l.type==='txn'?'<span class="badge badge-txn">TXN</span>':l.type==='junk'?'<span class="badge badge-junk">JUNK</span>':''} <span>${l.text}</span>`;
+                lineDiv.innerHTML = `<span style="color:#64748b; width:40px;">${i+1}</span>${l.type==='txn'?'<span class="badge badge-txn">TXN</span>':l.type==='junk'?'<span class="badge badge-junk">JUNK</span>':''} <span>${l.text}</span>`;
                 raw.appendChild(lineDiv);
             });
         });
 
-        // 4. Exclusions
+        // 5. Exclusions
         const exclusionTable = elements.exclusionTable();
         exclusionTable.innerHTML = '';
         appState.masterExclusions.forEach(ex => {
@@ -1175,30 +1328,49 @@ function renderAll(totalErrors) {
     }
 }
 
+window.toggleCodeSplit = () => {
+    appState.splitCode = !appState.splitCode;
+    localStorage.setItem('bankflow_v7_split_code', appState.splitCode ? 'true' : 'false');
+    renderAll(appState.lastTotalErrors || 0);
+};
+
 window.jumpToFile = (id) => {
     const el = document.getElementById(id);
     if (el) {
         document.querySelector('.tab-btn[data-tab="parsed"]').click();
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.background = 'rgba(56, 189, 248, 0.2)';
+        el.style.background = 'rgba(0, 82, 204, 0.12)';
         setTimeout(() => el.style.background = '', 2000);
     }
 };
 
 function exportAll(type) {
     const data = appState.masterTransactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details);
-        return { 
-            Date: t.date, 
-            Year: t.year || "",
-            "Details 1 (Type)": details1, 
-            "Details 2 (Code)": details2, 
-            "Details 3 (Additional)": details3, 
-            Category: t.category, 
-            Amount: t.amount, 
-            Balance: t.balance, 
-            Source: t.source 
-        };
+        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
+        if (appState.splitCode) {
+            return { 
+                Date: t.date, 
+                Year: t.year || "",
+                "Details 1 (Type)": details1, 
+                "Details 2 (Code)": details2, 
+                "Details 3 (Additional)": details3, 
+                Category: t.category, 
+                Amount: t.amount, 
+                Balance: t.balance, 
+                Source: t.source 
+            };
+        } else {
+            return { 
+                Date: t.date, 
+                Year: t.year || "",
+                "Details 1 (Type)": details1, 
+                "Details 2 (Additional)": details3, 
+                Category: t.category, 
+                Amount: t.amount, 
+                Balance: t.balance, 
+                Source: t.source 
+            };
+        }
     });
     downloadData(data, `Master_Batch_Export`, type);
 }
@@ -1207,17 +1379,29 @@ window.exportOne = (filename, type) => {
     const file = appState.batchData.find(d => d.filename === filename);
     if (!file) return;
     const data = file.transactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details);
-        return { 
-            Date: t.date, 
-            Year: t.year || "",
-            "Details 1 (Type)": details1, 
-            "Details 2 (Code)": details2, 
-            "Details 3 (Additional)": details3, 
-            Category: t.category, 
-            Amount: t.amount, 
-            Balance: t.balance 
-        };
+        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
+        if (appState.splitCode) {
+            return { 
+                Date: t.date, 
+                Year: t.year || "",
+                "Details 1 (Type)": details1, 
+                "Details 2 (Code)": details2, 
+                "Details 3 (Additional)": details3, 
+                Category: t.category, 
+                Amount: t.amount, 
+                Balance: t.balance 
+            };
+        } else {
+            return { 
+                Date: t.date, 
+                Year: t.year || "",
+                "Details 1 (Type)": details1, 
+                "Details 2 (Additional)": details3, 
+                Category: t.category, 
+                Amount: t.amount, 
+                Balance: t.balance 
+            };
+        }
     });
     downloadData(data, `${filename.replace('.pdf', '')}_Parsed`, type);
 };
