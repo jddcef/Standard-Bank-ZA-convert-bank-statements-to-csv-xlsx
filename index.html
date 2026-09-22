@@ -51,9 +51,9 @@
                 <button id="toggleConfig" class="btn-secondary">
                     <i data-lucide="sliders"></i> Global Rules
                 </button>
-                <label class="toggle-item active" data-filter="strict">
+                <label class="toggle-item" data-filter="strict">
                     <i data-lucide="target"></i> Strict Mode
-                    <input type="checkbox" checked>
+                    <input type="checkbox">
                 </label>
             </div>
         </div>
@@ -78,8 +78,8 @@
 
             <div class="tab-content active" id="tab-parsed">
                 <div class="table-actions" style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem; gap: 0.75rem;">
-                    <button id="exportMasterCsv" class="btn-secondary btn-sm" style="width:auto;"><i data-lucide="download"></i> Combined CSV</button>
-                    <button id="exportMasterXlsx" class="btn-secondary btn-sm" style="width:auto;"><i data-lucide="file-spreadsheet"></i> Combined XLSX</button>
+                    <button id="exportMasterCsv" class="btn-download btn-sm" style="width:auto;"><i data-lucide="download"></i> Download Combined CSV</button>
+                    <button id="exportMasterXlsx" class="btn-download btn-sm" style="width:auto;"><i data-lucide="file-spreadsheet"></i> Download Combined XLSX</button>
                 </div>
                 <div class="table-container">
                     <table id="txnTable">
@@ -135,6 +135,20 @@
                 <button id="closeConfig" class="btn-secondary" style="width: auto;">Cancel</button>
                 <button id="saveConfig" class="btn-primary" style="width: auto; padding: 0 2.5rem;">Update Batch</button>
             </div>
+        </div>
+    </div>
+
+    <div id="passwordModal" class="modal hidden">
+        <div class="modal-content modal-sm">
+            <h2 style="margin-bottom: 0.75rem; font-family: 'Outfit';">PDF Password Required</h2>
+            <p id="passwordMessage" style="color: var(--text-secondary); margin-bottom: 1rem;"></p>
+            <form id="passwordForm">
+                <input type="password" id="passwordInput" class="text-input" autocomplete="current-password" placeholder="Enter PDF password">
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.25rem;">
+                    <button type="button" id="cancelPassword" class="btn-secondary" style="width: auto;">Cancel</button>
+                    <button type="submit" id="submitPassword" class="btn-primary" style="width: auto; padding: 0 2rem;">Unlock PDF</button>
+                </div>
+            </form>
         </div>
     </div>
 

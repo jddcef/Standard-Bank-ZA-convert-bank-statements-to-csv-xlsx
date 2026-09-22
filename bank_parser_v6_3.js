@@ -27,9 +27,12 @@ let appState = {
     batchData: [], 
     junkKeywords: [...DEFAULT_JUNK_KEYWORDS],
     categories: [...DEFAULT_CATEGORIES],
-    filters: { keyword: true, regex: true, strict: true, sanity: true },
+    filters: { keyword: true, regex: true, strict: false, sanity: true },
     masterTransactions: [],
-    masterExclusions: []
+    masterExclusions: [],
+    lastPdfPassword: '',
+    pendingPasswordRequest: null,
+    resumeLoaderText: ''
 };
 
 function refreshIcons() {
@@ -58,6 +61,11 @@ const elements = {
     loader: () => document.getElementById('loader'),
     loaderText: () => document.getElementById('loaderText'),
     configModal: () => document.getElementById('configModal'),
+    passwordModal: () => document.getElementById('passwordModal'),
+    passwordForm: () => document.getElementById('passwordForm'),
+    passwordMessage: () => document.getElementById('passwordMessage'),
+    passwordInput: () => document.getElementById('passwordInput'),
+    cancelPassword: () => document.getElementById('cancelPassword'),
     categoryInput: () => document.getElementById('categoryInput'),
     junkInput: () => document.getElementById('junkInput'),
     saveConfig: () => document.getElementById('saveConfig'),
@@ -78,8 +86,18 @@ function init() {
     if (savedCats) appState.categories = savedCats.split('\n').filter(l => l.trim());
     elements.junkInput().value = appState.junkKeywords.join('\n');
     elements.categoryInput().value = appState.categories.join('\n');
+    syncToggleStates();
     setupEvents();
     refreshIcons();
+}
+
+function syncToggleStates() {
+    elements.toggles().forEach(t => {
+        const input = t.querySelector('input');
+        const enabled = !!appState.filters[t.dataset.filter];
+        input.checked = enabled;
+        t.classList.toggle('active', enabled);
+    });
 }
 
 function setupEvents() {
@@ -120,6 +138,17 @@ function setupEvents() {
         const modal = elements.configModal();
         modal.classList.remove('visible');
         setTimeout(() => modal.classList.add('hidden'), 300);
+    };
+
+    elements.cancelPassword().onclick = () => settlePasswordPrompt(null);
+    elements.passwordForm().onsubmit = e => {
+        e.preventDefault();
+        const password = elements.passwordInput().value;
+        if (!password.trim()) {
+            elements.passwordInput().focus();
+            return;
+        }
+        settlePasswordPrompt(password);
     };
 
     elements.saveConfig().onclick = () => {
@@ -166,14 +195,40 @@ async function processFiles(files) {
 async function parsePdf(file) {
     const buffer = await file.arrayBuffer();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const doc = await pdfjsLib.getDocument({ data: buffer }).promise;
-    let lines = [];
-    for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        lines.push(...groupLines(content.items));
-    }
-    return lines;
+    const loadingTask = pdfjsLib.getDocument({ data: buffer, password: appState.lastPdfPassword || undefined });
+    return new Promise((resolve, reject) => {
+        let cancelled = false;
+        loadingTask.onPassword = (updatePassword, reason) => {
+            requestPdfPassword(file.name, reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD)
+                .then(password => {
+                    if (password === null) {
+                        cancelled = true;
+                        loadingTask.destroy();
+                        reject(new Error(`Password entry cancelled for ${file.name}`));
+                        return;
+                    }
+                    appState.lastPdfPassword = password;
+                    updatePassword(password);
+                })
+                .catch(reject);
+        };
+
+        loadingTask.promise.then(async doc => {
+            try {
+                let lines = [];
+                for (let i = 1; i <= doc.numPages; i++) {
+                    const page = await doc.getPage(i);
+                    const content = await page.getTextContent();
+                    lines.push(...groupLines(content.items));
+                }
+                resolve(lines);
+            } catch (err) {
+                reject(err);
+            }
+        }).catch(err => {
+            if (!cancelled) reject(err);
+        });
+    });
 }
 
 function groupLines(items) {
@@ -447,6 +502,42 @@ function downloadBlob(content, name, mime) {
     a.href = u; a.download = name;
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(u); }, 0);
+}
+
+function requestPdfPassword(filename, incorrectPassword = false) {
+    if (appState.pendingPasswordRequest) return Promise.reject(new Error('Another password prompt is already open.'));
+    const modal = elements.passwordModal();
+    const loaderIsVisible = !elements.loader().classList.contains('hidden');
+    appState.resumeLoaderText = loaderIsVisible ? elements.loaderText().textContent : '';
+    if (loaderIsVisible) hideLoader();
+    elements.passwordMessage().textContent = incorrectPassword
+        ? `The password for ${filename} was incorrect. Enter the correct password to continue.`
+        : `${filename} is password-protected. Enter the PDF password to continue parsing.`;
+    elements.passwordInput().value = incorrectPassword ? '' : appState.lastPdfPassword;
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modal.classList.add('visible');
+        elements.passwordInput().focus();
+        elements.passwordInput().select();
+    }, 10);
+    return new Promise(resolve => {
+        appState.pendingPasswordRequest = resolve;
+    });
+}
+
+function settlePasswordPrompt(password) {
+    const resolve = appState.pendingPasswordRequest;
+    if (!resolve) return;
+    appState.pendingPasswordRequest = null;
+    const modal = elements.passwordModal();
+    modal.classList.remove('visible');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+    if (password === null) elements.passwordInput().value = '';
+    if (appState.resumeLoaderText) {
+        showLoader(appState.resumeLoaderText);
+        appState.resumeLoaderText = '';
+    }
+    resolve(password);
 }
 
 function showLoader(t) { elements.loaderText().textContent = t; elements.loader().classList.remove('hidden'); }
