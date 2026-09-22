@@ -1,0 +1,108 @@
+/* BankFlow v7.0 CSS - Premium Modern Layout */
+:root {
+    --bg-color: #0f172a;
+    --sidebar-bg: #1e293b;
+    --card-bg: #0f172a;
+    --border-color: #334155;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --accent-color: #38bdf8;
+    --accent-hover: #0ea5e9;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #8b5cf6;
+    --font-main: 'Inter', sans-serif;
+    --sidebar-width: 320px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background-color: var(--bg-color); color: var(--text-primary); font-family: var(--font-main); display: flex; min-height: 100vh; }
+
+aside { width: var(--sidebar-width); background: var(--sidebar-bg); border-right: 1px solid var(--border-color); position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 100; }
+main { margin-left: var(--sidebar-width); flex: 1; padding: 2rem; width: calc(100% - var(--sidebar-width)); }
+
+/* Dashboard Sidebar */
+.sidebar-header { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+.sidebar-content { padding: 1.5rem; overflow-y: auto; flex: 1; }
+.sidebar-section { margin-bottom: 2rem; }
+.sidebar-section h3 { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.75rem; letter-spacing: 0.1em; }
+
+.file-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.file-item { background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.75rem; font-size: 0.75rem; transition: transform 0.2s, border-color 0.2s; }
+.file-item:hover { border-color: var(--accent-color); transform: translateY(-1px); }
+.file-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+.file-name { font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 170px; }
+.file-name.clickable { cursor: pointer; transition: 0.2s; }
+.file-name.clickable:hover { color: var(--accent-color); text-decoration: underline; }
+
+.file-stats { display: flex; justify-content: space-between; align-items: center; color: var(--text-secondary); }
+.file-badge { font-size: 0.6rem; padding: 1px 6px; border-radius: 4px; font-weight: 700; border: 1px solid transparent; }
+.file-badge.ok { background: rgba(16, 185, 129, 0.1); color: var(--success); border-color: var(--success); }
+.file-badge.err { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: var(--danger); }
+.icon-btn { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; padding: 4px; border-radius: 4px; }
+.icon-btn:hover { color: var(--accent-color); background: rgba(56, 189, 248, 0.1); }
+
+/* Tabs & Tables */
+.tabs { display: flex; gap: 2rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); }
+.tab-btn { background: transparent; border: none; color: var(--text-secondary); padding: 1rem 0; cursor: pointer; font-weight: 600; font-size: 0.85rem; position: relative; }
+.tab-btn.active { color: var(--accent-color); }
+.tab-btn.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: var(--accent-color); }
+.tab-content { display: none !important; }
+.tab-content.active { display: block !important; }
+
+.table-container { background: var(--sidebar-bg); border-radius: 0.75rem; border: 1px solid var(--border-color); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th { text-align: left; padding: 0.8rem 1rem; background: rgba(15, 23, 42, 0.5); color: var(--text-secondary); text-transform: uppercase; font-size: 0.65rem; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10; }
+td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border-color); transition: background 0.5s; }
+.text-right { text-align: right; }
+.wrap { white-space: normal; max-width: 300px; line-height: 1.4; }
+
+/* Utilities */
+.hidden { display: none !important; }
+.visible { display: flex !important; opacity: 1 !important; pointer-events: auto !important; }
+.stat-box { background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 0.75rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.stat-val { font-weight: 700; color: var(--accent-color); }
+.btn-primary { background: var(--accent-color); color: #000; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%; transition: background 0.2s; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-secondary { background: transparent; border: 1px solid var(--border-color); color: #fff; padding: 0.75rem; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%; transition: background 0.2s; }
+.btn-secondary:hover { background: rgba(255,255,255,0.05); }
+
+/* Modal */
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(4px); }
+.modal-content { background: var(--sidebar-bg); width: 90%; max-width: 800px; border-radius: 1rem; border: 1px solid var(--border-color); padding: 2rem; }
+textarea { width: 100%; height: 120px; background: #020617; border: 1px solid var(--border-color); color: #fff; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.8rem; margin-bottom: 1rem; }
+
+.drop-zone { border: 2px dashed var(--border-color); border-radius: 1rem; padding: 6rem 2rem; text-align: center; cursor: pointer; background: rgba(30, 41, 59, 0.2); transition: 0.3s; }
+.drop-zone:hover { border-color: var(--accent-color); background: rgba(30, 41, 59, 0.3); }
+
+#jumpToTop { position: fixed; bottom: 2rem; right: 2rem; background: var(--accent-color); color: #000; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; opacity: 0; transition: 0.3s; z-index: 1000; }
+#jumpToTop.visible { opacity: 1; }
+
+.sanity-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+.sanity-ok { background: var(--success); }
+.sanity-err { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.math-note { font-size: 0.65rem; color: var(--text-secondary); }
+
+.code-view { background: #020617; border-radius: 0.75rem; padding: 1.5rem; font-family: monospace; font-size: 0.75rem; max-height: 80vh; overflow: auto; border: 1px solid var(--border-color); }
+.raw-line { padding: 4px; display: flex; gap: 1rem; }
+.raw-line.txn { border-left: 3px solid var(--success); background: rgba(16, 185, 129, 0.05); }
+.raw-line.junk { border-left: 3px solid var(--danger); background: rgba(239, 68, 68, 0.05); }
+.raw-line.ignored { color: var(--text-secondary); }
+.raw-line.info { color: var(--accent-color); font-weight: bold; }
+
+.badge { padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 0.6rem; margin-right: 8px; text-transform: uppercase; }
+.badge-txn { background: var(--success); color: #000; }
+.badge-junk { background: var(--danger); color: #fff; }
+
+/* Statement Type Badges */
+.badge-statement-type { display: inline-flex; align-items: center; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; border: 1px solid transparent; width: fit-content; }
+.badge-statement-type.cc { background: rgba(139, 92, 246, 0.1); color: #c084fc; border-color: rgba(139, 92, 246, 0.2); }
+.badge-statement-type.current { background: rgba(14, 165, 233, 0.1); color: #38bdf8; border-color: rgba(14, 165, 233, 0.2); }
+.badge-statement-type.weekly { background: rgba(16, 185, 129, 0.1); color: #10b981; border-color: rgba(16, 185, 129, 0.2); }
+
+/* Password Modal */
+.modal-sm { max-width: 460px !important; }
+.text-input { width: 100%; background: #020617; border: 1px solid var(--border-color); color: #fff; padding: 0.85rem 1rem; border-radius: 0.5rem; font-size: 0.95rem; outline: none; }
+.text-input:focus { border-color: var(--accent-color); }
+
