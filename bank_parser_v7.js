@@ -144,6 +144,7 @@ const elements = {
     splitMethodSelect: () => document.getElementById('splitMethodSelect'),
     splitXInput: () => document.getElementById('splitXInput'),
     customXContainer: () => document.getElementById('customXContainer'),
+    startOverButtons: () => document.querySelectorAll('.btn-start-over'),
     passwordModal: () => document.getElementById('passwordModal'),
     passwordForm: () => document.getElementById('passwordForm'),
     passwordMessage: () => document.getElementById('passwordMessage'),
@@ -411,6 +412,76 @@ function setupEvents() {
             settlePasswordPrompt(password);
         };
     }
+
+    setupStartOver();
+}
+
+function setupStartOver() {
+    const startOverButtons = elements.startOverButtons ? elements.startOverButtons() : document.querySelectorAll('.btn-start-over');
+    if (!startOverButtons || !startOverButtons.length) return;
+
+    let confirmTimer = null;
+    let isConfirming = false;
+
+    function resetConfirm() {
+        if (confirmTimer) {
+            clearTimeout(confirmTimer);
+            confirmTimer = null;
+        }
+        isConfirming = false;
+        startOverButtons.forEach(btn => {
+            btn.classList.remove('confirming');
+            btn.innerHTML = '<i data-lucide="rotate-ccw"></i> Start Over';
+        });
+        refreshIcons();
+    }
+
+    startOverButtons.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (isConfirming) {
+                if (confirmTimer) clearTimeout(confirmTimer);
+                startOverButtons.forEach(b => {
+                    b.innerHTML = '<i data-lucide="refresh-cw"></i> Resetting...';
+                });
+                refreshIcons();
+                try {
+                    sessionStorage.clear();
+                } catch (_) {}
+                window.location.reload();
+            } else {
+                isConfirming = true;
+                startOverButtons.forEach(b => {
+                    b.classList.add('confirming');
+                    b.innerHTML = '<i data-lucide="alert-triangle"></i> Press again to confirm';
+                });
+                refreshIcons();
+
+                confirmTimer = setTimeout(() => {
+                    resetConfirm();
+                }, 4000);
+            }
+        };
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!isConfirming) return;
+        let clickedInside = false;
+        startOverButtons.forEach(btn => {
+            if (btn.contains(e.target)) clickedInside = true;
+        });
+        if (!clickedInside) {
+            resetConfirm();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isConfirming) {
+            resetConfirm();
+        }
+    });
 }
 
 function requestPdfPassword(filename, incorrectPassword = false) {

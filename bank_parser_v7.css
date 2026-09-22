@@ -155,3 +155,35 @@ textarea:focus { border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(0
     border-color: var(--accent-color);
 }
 
+/* Start Over Button & Confirmation */
+.btn-start-over {
+    transition: all 0.2s ease;
+    user-select: none;
+}
+.btn-start-over:hover {
+    color: var(--danger);
+    border-color: var(--danger-border);
+    background: var(--danger-bg);
+}
+.btn-start-over.confirming {
+    background: var(--danger) !important;
+    border-color: var(--danger) !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2) !important;
+    animation: pulse-danger 0.8s infinite alternate ease-in-out;
+}
+.btn-start-over.confirming i,
+.btn-start-over.confirming svg {
+    stroke: #ffffff !important;
+}
+.btn-start-over.confirming:hover {
+    background: #b91c1c !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
+}
+
+@keyframes pulse-danger {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.02); }
+}
+
