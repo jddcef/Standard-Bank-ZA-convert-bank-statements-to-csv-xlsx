@@ -64,6 +64,8 @@ td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border-color); transit
 .stat-val { font-weight: 700; color: var(--accent-color); }
 .btn-primary { background: var(--accent-color); color: #000; border: none; padding: 0.75rem; border-radius: 0.5rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%; }
 .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: #fff; padding: 0.75rem; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%; }
+.btn-download { background: linear-gradient(135deg, #f59e0b, #f97316); border: 1px solid #fdba74; color: #fff; padding: 0.75rem 1rem; border-radius: 0.65rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; justify-content: center; box-shadow: 0 10px 24px rgba(249, 115, 22, 0.35); transition: transform 0.2s, box-shadow 0.2s, filter 0.2s; }
+.btn-download:hover { transform: translateY(-1px); filter: brightness(1.05); box-shadow: 0 14px 30px rgba(249, 115, 22, 0.45); }
 
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(4px); }
