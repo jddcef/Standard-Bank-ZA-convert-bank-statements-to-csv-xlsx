@@ -314,6 +314,7 @@ function init() {
     elements.customXContainer().style.display = appState.splitMethod === 'custom' ? 'block' : 'none';
     
     setupEvents();
+    updateDownloadButtons();
     refreshIcons();
 }
 
@@ -1322,9 +1323,23 @@ function renderAll(totalErrors) {
             exclusionTable.appendChild(row);
         });
         
+        updateDownloadButtons();
         refreshIcons();
     } catch (renderErr) {
         console.error("Rendering Error:", renderErr);
+    }
+}
+
+function updateDownloadButtons() {
+    const count = appState.batchData ? appState.batchData.length : 0;
+    const countSuffix = count > 1 ? ` (${count})` : '';
+    const csvBtn = document.getElementById('exportMasterCsv');
+    const xlsxBtn = document.getElementById('exportMasterXlsx');
+    if (csvBtn) {
+        csvBtn.innerHTML = `<i data-lucide="download"></i> Download CSV${countSuffix}`;
+    }
+    if (xlsxBtn) {
+        xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> Download XLSX${countSuffix}`;
     }
 }
 
@@ -1372,7 +1387,9 @@ function exportAll(type) {
             };
         }
     });
-    downloadData(data, `Master_Batch_Export`, type);
+    const count = appState.batchData ? appState.batchData.length : 0;
+    const baseName = count > 1 ? `Combined_Batch_${count}_Statements` : `Master_Batch_Export`;
+    downloadData(data, baseName, type);
 }
 
 window.exportOne = (filename, type) => {
