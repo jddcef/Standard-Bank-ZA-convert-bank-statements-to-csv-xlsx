@@ -186,20 +186,39 @@ async function parsePdf(file) {
     const buffer = await file.arrayBuffer();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const loadingTask = pdfjsLib.getDocument({ data: buffer, password: appState.lastPdfPassword || undefined });
-    loadingTask.onPassword = async (updatePassword, reason) => {
-        const password = await requestPdfPassword(file.name, reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD);
-        if (password === null) throw new Error(`Password entry cancelled for ${file.name}`);
-        appState.lastPdfPassword = password;
-        updatePassword(password);
-    };
-    const doc = await loadingTask.promise;
-    let lines = [];
-    for (let i = 1; i <= doc.numPages; i++) {
-        const page = await doc.getPage(i);
-        const content = await page.getTextContent();
-        lines.push(...groupLines(content.items));
-    }
-    return lines;
+    return new Promise((resolve, reject) => {
+        let cancelled = false;
+        loadingTask.onPassword = (updatePassword, reason) => {
+            requestPdfPassword(file.name, reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD)
+                .then(password => {
+                    if (password === null) {
+                        cancelled = true;
+                        loadingTask.destroy();
+                        reject(new Error(`Password entry cancelled for ${file.name}`));
+                        return;
+                    }
+                    appState.lastPdfPassword = password;
+                    updatePassword(password);
+                })
+                .catch(reject);
+        };
+
+        loadingTask.promise.then(async doc => {
+            try {
+                let lines = [];
+                for (let i = 1; i <= doc.numPages; i++) {
+                    const page = await doc.getPage(i);
+                    const content = await page.getTextContent();
+                    lines.push(...groupLines(content.items));
+                }
+                resolve(lines);
+            } catch (err) {
+                reject(err);
+            }
+        }).catch(err => {
+            if (!cancelled) reject(err);
+        });
+    });
 }
 
 function groupLines(items) {
