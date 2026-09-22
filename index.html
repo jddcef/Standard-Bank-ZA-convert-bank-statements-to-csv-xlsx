@@ -138,6 +138,20 @@
         </div>
     </div>
 
+    <div id="passwordModal" class="modal hidden">
+        <div class="modal-content modal-sm">
+            <h2 style="margin-bottom: 0.75rem; font-family: 'Outfit';">PDF Password Required</h2>
+            <p id="passwordMessage" style="color: var(--text-secondary); margin-bottom: 1rem;"></p>
+            <form id="passwordForm">
+                <input type="password" id="passwordInput" class="text-input" autocomplete="current-password" placeholder="Enter PDF password">
+                <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.25rem;">
+                    <button type="button" id="cancelPassword" class="btn-secondary" style="width: auto;">Cancel</button>
+                    <button type="submit" id="submitPassword" class="btn-primary" style="width: auto; padding: 0 2rem;">Unlock PDF</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="loader" class="loader-overlay hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(10px);">
         <div style="text-align: center; position: relative; padding: 2.5rem; background: var(--sidebar-bg); border: 1px solid var(--border-color); border-radius: 1.5rem; min-width: 350px;">
             <button id="closeLoader" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-secondary); cursor: pointer;">

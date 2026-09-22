@@ -68,7 +68,10 @@ td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border-color); transit
 /* Modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 1000; opacity: 0; transition: opacity 0.3s; backdrop-filter: blur(4px); }
 .modal-content { background: var(--sidebar-bg); width: 90%; max-width: 800px; border-radius: 1rem; border: 1px solid var(--border-color); padding: 2rem; }
+.modal-sm { max-width: 460px; }
 textarea { width: 100%; height: 120px; background: #020617; border: 1px solid var(--border-color); color: #fff; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.8rem; margin-bottom: 1rem; }
+.text-input { width: 100%; background: #020617; border: 1px solid var(--border-color); color: #fff; padding: 0.9rem 1rem; border-radius: 0.5rem; font-size: 0.9rem; }
+.text-input:focus { outline: 1px solid var(--accent-color); border-color: var(--accent-color); }
 
 .drop-zone { border: 2px dashed var(--border-color); border-radius: 1rem; padding: 6rem 2rem; text-align: center; cursor: pointer; background: rgba(30, 41, 59, 0.2); transition: 0.3s; }
 #jumpToTop { position: fixed; bottom: 2rem; right: 2rem; background: var(--accent-color); color: #000; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; opacity: 0; transition: 0.3s; z-index: 1000; }
