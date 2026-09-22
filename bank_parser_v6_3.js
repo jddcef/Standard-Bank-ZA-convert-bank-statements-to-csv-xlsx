@@ -27,7 +27,7 @@ let appState = {
     batchData: [], 
     junkKeywords: [...DEFAULT_JUNK_KEYWORDS],
     categories: [...DEFAULT_CATEGORIES],
-    filters: { keyword: true, regex: true, strict: true, sanity: true },
+    filters: { keyword: true, regex: true, strict: false, sanity: true },
     masterTransactions: [],
     masterExclusions: [],
     lastPdfPassword: '',
@@ -86,8 +86,18 @@ function init() {
     if (savedCats) appState.categories = savedCats.split('\n').filter(l => l.trim());
     elements.junkInput().value = appState.junkKeywords.join('\n');
     elements.categoryInput().value = appState.categories.join('\n');
+    syncToggleStates();
     setupEvents();
     refreshIcons();
+}
+
+function syncToggleStates() {
+    elements.toggles().forEach(t => {
+        const input = t.querySelector('input');
+        const enabled = !!appState.filters[t.dataset.filter];
+        input.checked = enabled;
+        t.classList.toggle('active', enabled);
+    });
 }
 
 function setupEvents() {
