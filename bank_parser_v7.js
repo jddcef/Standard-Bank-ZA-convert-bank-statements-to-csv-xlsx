@@ -34,6 +34,7 @@ let appState = {
     lastTotalErrors: 0,
     masterTransactions: [],
     masterExclusions: [],
+    nextBatchFileId: 1,
     lastPdfPassword: '',
     pendingPasswordRequest: null,
     resumeLoaderText: ''
@@ -140,6 +141,7 @@ const elements = {
     textModalArea: () => document.getElementById('textModalArea'),
     copyTextModal: () => document.getElementById('copyTextModal'),
     closeTextModal: () => document.getElementById('closeTextModal'),
+    downloadScope: () => document.getElementById('downloadScope'),
     downloadMethod: () => document.getElementById('downloadMethod'),
     splitMethodSelect: () => document.getElementById('splitMethodSelect'),
     splitXInput: () => document.getElementById('splitXInput'),
@@ -314,6 +316,7 @@ function init() {
     elements.customXContainer().style.display = appState.splitMethod === 'custom' ? 'block' : 'none';
     
     setupEvents();
+    syncDownloadMethodForScope();
     updateDownloadButtons();
     refreshIcons();
 }
@@ -323,10 +326,21 @@ function setupEvents() {
     elements.addFiles().onclick = () => elements.fileInput().click();
     document.getElementById('closeLoader').onclick = () => hideLoader();
     
-    elements.fileInput().onchange = e => e.target.files.length && processFiles(Array.from(e.target.files));
+    elements.fileInput().onchange = e => {
+        if (!e.target.files.length) return;
+        const files = Array.from(e.target.files);
+        e.target.value = '';
+        processFiles(files);
+    };
     elements.dropZone().ondragover = e => { e.preventDefault(); elements.dropZone().classList.add('active'); };
     elements.dropZone().ondragleave = () => elements.dropZone().classList.remove('active');
     elements.dropZone().ondrop = e => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); };
+    if (elements.downloadScope()) {
+        elements.downloadScope().onchange = () => {
+            syncDownloadMethodForScope();
+            updateDownloadButtons();
+        };
+    }
 
     elements.toggles().forEach(t => {
         const input = t.querySelector('input');
@@ -531,6 +545,7 @@ async function processFiles(files) {
             showLoader(`Parsing ${file.name}...`);
             const parsed = await parsePdf(file);
             appState.batchData.push({ 
+                id: `batch-file-${appState.nextBatchFileId++}`,
                 filename: file.name, size: file.size, 
                 rawPages: parsed.rawPages, // Raw in-memory page store for instant split-method updating!
                 lines: [], 
@@ -992,11 +1007,100 @@ function applyBatchFilters() {
 
         fileData.errorCount = performFileSanity(fileData);
         totalErrors += fileData.errorCount;
+        fileData.transactions.forEach(t => {
+            t.sourceFileId = fileData.id;
+        });
         appState.masterTransactions.push(...fileData.transactions);
         appState.masterExclusions.push(...fileData.exclusions);
     });
 
     renderAll(totalErrors);
+}
+
+function removeFileFromSession(fileId) {
+    const nextBatchData = appState.batchData.filter(file => file.id !== fileId);
+    if (nextBatchData.length === appState.batchData.length) return;
+    appState.batchData = nextBatchData;
+    applyBatchFilters();
+    if (!appState.batchData.length) {
+        resetSessionUi();
+    }
+}
+
+function buildExportRows(transactions, includeSource = false) {
+    return transactions.map(t => {
+        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
+        const row = appState.splitCode
+            ? {
+                Date: t.date,
+                Year: t.year || "",
+                "Details 1 (Type)": details1,
+                "Details 2 (Code)": details2,
+                "Details 3 (Additional)": details3,
+                Category: t.category,
+                Amount: t.amount,
+                Balance: t.balance
+            }
+            : {
+                Date: t.date,
+                Year: t.year || "",
+                "Details 1 (Type)": details1,
+                "Details 2 (Additional)": details3,
+                Category: t.category,
+                Amount: t.amount,
+                Balance: t.balance
+            };
+        if (includeSource) row.Source = t.source;
+        return row;
+    });
+}
+
+function buildParsedExportName(file, index = null) {
+    const baseName = (file.filename || 'Statement').replace(/\.pdf$/i, '') || 'Statement';
+    if (index === null || index === undefined) {
+        return `${baseName}_Parsed`;
+    }
+    return `${String(index + 1).padStart(2, '0')}_${baseName}_Parsed`;
+}
+
+function getDownloadScope() {
+    const scopeSelect = elements.downloadScope();
+    return scopeSelect ? scopeSelect.value : 'combined';
+}
+
+function syncDownloadMethodForScope() {
+    const scope = getDownloadScope();
+    const methodSelect = elements.downloadMethod();
+    if (!methodSelect) return;
+    const separateMode = scope === 'separate';
+    Array.from(methodSelect.options).forEach(option => {
+        option.disabled = separateMode && option.value !== 'blob';
+    });
+    if (separateMode && methodSelect.value !== 'blob') {
+        methodSelect.value = 'blob';
+    }
+    methodSelect.title = separateMode
+        ? 'Separate file exports use Blob URL downloads'
+        : 'Export delivery mechanism';
+}
+
+function resetSessionUi() {
+    appState.masterTransactions = [];
+    appState.masterExclusions = [];
+    appState.lastTotalErrors = 0;
+    elements.resultsArea().classList.add('hidden');
+    elements.dropZone().classList.remove('hidden');
+    elements.dashboard().innerHTML = '';
+    elements.txnTable().innerHTML = '';
+    elements.rawOutput().innerHTML = '';
+    elements.exclusionTable().innerHTML = '';
+    elements.fileCount().textContent = '0';
+    elements.txnCount().textContent = '0';
+    elements.batchStatus().textContent = 'Ready';
+    const parsedTab = document.querySelector('.tab-btn[data-tab="parsed"]');
+    if (parsedTab) parsedTab.click();
+    syncDownloadMethodForScope();
+    updateDownloadButtons();
 }
 
 function getCategory(details) {
@@ -1218,13 +1322,13 @@ function renderAll(totalErrors) {
         // 2. Master Table Body
         const table = elements.txnTable();
         table.innerHTML = '';
-        let lastSource = null;
+        let lastSourceFileId = null;
 
         appState.masterTransactions.forEach(t => {
             const row = document.createElement('tr');
-            if (t.source !== lastSource) {
-                row.id = sanitizeId(t.source);
-                lastSource = t.source;
+            if (t.sourceFileId !== lastSourceFileId) {
+                row.id = t.sourceFileId || sanitizeId(t.source);
+                lastSourceFileId = t.sourceFileId;
             }
             const amtCls = parseFloat(t.amount) < 0 ? 'text-danger' : 'text-success';
             const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
@@ -1270,31 +1374,67 @@ function renderAll(totalErrors) {
         appState.batchData.forEach(file => {
             const item = document.createElement('div');
             item.className = 'file-item';
-            const fileId = sanitizeId(file.filename);
+            const fileId = file.id || sanitizeId(file.filename);
             const ccBadge = file.statementType === 'credit' 
                 ? '<span class="badge-statement-type cc">Credit Card</span>'
                 : (file.statementType === 'weekly'
                     ? '<span class="badge-statement-type weekly">Weekly Statement</span>'
                     : '<span class="badge-statement-type current">Current Account</span>');
-                
-            item.innerHTML = `
-                <div class="file-item-header">
-                    <span class="file-name clickable" onclick="jumpToFile('${fileId}')" title="Jump to this file">${file.filename}</span>
-                    <div class="file-actions">
-                        <button class="icon-btn" onclick="exportOne('${file.filename}', 'csv')"><i data-lucide="file-text" style="width:14px;"></i></button>
-                        <button class="icon-btn" onclick="exportOne('${file.filename}', 'xlsx')"><i data-lucide="file-spreadsheet" style="width:14px;"></i></button>
-                    </div>
-                </div>
-                <div class="file-metadata" style="margin-top: 4px; color: var(--text-secondary); font-size: 0.7rem; display: flex; flex-direction: column; gap: 2px;">
-                    ${file.statementNo ? `<span>Statement No: <strong>${file.statementNo}</strong></span>` : ''}
-                    <span>Period: <strong>${file.periodText}</strong></span>
-                    ${ccBadge}
-                </div>
-                <div class="file-stats" style="margin-top: 6px;">
-                    <span>${file.transactions.length} rows</span>
-                    <span class="file-badge ${file.errorCount > 0 ? 'err' : 'ok'}">${file.errorCount > 0 ? file.errorCount + ' Errors' : 'Verified'}</span>
-                </div>
+
+            const header = document.createElement('div');
+            header.className = 'file-item-header';
+
+            const fileName = document.createElement('span');
+            fileName.className = 'file-name clickable';
+            fileName.title = 'Jump to this file';
+            fileName.textContent = file.filename;
+            fileName.onclick = () => window.jumpToFile(fileId);
+
+            const actions = document.createElement('div');
+            actions.className = 'file-actions';
+
+            const csvBtn = document.createElement('button');
+            csvBtn.className = 'icon-btn';
+            csvBtn.type = 'button';
+            csvBtn.title = 'Download this file as CSV';
+            csvBtn.innerHTML = '<i data-lucide="file-text" style="width:14px;"></i>';
+            csvBtn.onclick = () => window.exportOne(fileId, 'csv');
+
+            const xlsxBtn = document.createElement('button');
+            xlsxBtn.className = 'icon-btn';
+            xlsxBtn.type = 'button';
+            xlsxBtn.title = 'Download this file as XLSX';
+            xlsxBtn.innerHTML = '<i data-lucide="file-spreadsheet" style="width:14px;"></i>';
+            xlsxBtn.onclick = () => window.exportOne(fileId, 'xlsx');
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'icon-btn file-action-remove';
+            removeBtn.type = 'button';
+            removeBtn.title = 'Remove from current session';
+            removeBtn.innerHTML = '<i data-lucide="x" style="width:14px;"></i>';
+            removeBtn.onclick = () => removeFileFromSession(fileId);
+
+            actions.append(csvBtn, xlsxBtn, removeBtn);
+            header.append(fileName, actions);
+
+            const metadata = document.createElement('div');
+            metadata.className = 'file-metadata';
+            metadata.style.cssText = 'margin-top: 4px; color: var(--text-secondary); font-size: 0.7rem; display: flex; flex-direction: column; gap: 2px;';
+            metadata.innerHTML = `
+                ${file.statementNo ? `<span>Statement No: <strong>${file.statementNo}</strong></span>` : ''}
+                <span>Period: <strong>${file.periodText}</strong></span>
+                ${ccBadge}
             `;
+
+            const stats = document.createElement('div');
+            stats.className = 'file-stats';
+            stats.style.marginTop = '6px';
+            stats.innerHTML = `
+                <span>${file.transactions.length} rows</span>
+                <span class="file-badge ${file.errorCount > 0 ? 'err' : 'ok'}">${file.errorCount > 0 ? file.errorCount + ' Errors' : 'Verified'}</span>
+            `;
+
+            item.append(header, metadata, stats);
             dashboard.appendChild(item);
         });
 
@@ -1332,15 +1472,23 @@ function renderAll(totalErrors) {
 
 function updateDownloadButtons() {
     const count = appState.batchData ? appState.batchData.length : 0;
+    const scope = getDownloadScope();
     const countSuffix = count > 1 ? ` (${count})` : '';
     const csvBtn = document.getElementById('exportMasterCsv');
     const xlsxBtn = document.getElementById('exportMasterXlsx');
+    const csvLabel = scope === 'separate'
+        ? `Download CSV ${count === 1 ? 'File' : 'Files'}${countSuffix}`
+        : `Download CSV${countSuffix}`;
+    const xlsxLabel = scope === 'separate'
+        ? `Download XLSX ${count === 1 ? 'File' : 'Files'}${countSuffix}`
+        : `Download XLSX${countSuffix}`;
     if (csvBtn) {
-        csvBtn.innerHTML = `<i data-lucide="download"></i> Download CSV${countSuffix}`;
+        csvBtn.innerHTML = `<i data-lucide="download"></i> ${csvLabel}`;
     }
     if (xlsxBtn) {
-        xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> Download XLSX${countSuffix}`;
+        xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> ${xlsxLabel}`;
     }
+    refreshIcons();
 }
 
 window.toggleCodeSplit = () => {
@@ -1360,67 +1508,30 @@ window.jumpToFile = (id) => {
 };
 
 function exportAll(type) {
-    const data = appState.masterTransactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
-        if (appState.splitCode) {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Code)": details2, 
-                "Details 3 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance, 
-                Source: t.source 
-            };
-        } else {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance, 
-                Source: t.source 
-            };
-        }
-    });
     const count = appState.batchData ? appState.batchData.length : 0;
+    const scope = getDownloadScope();
+    if (scope === 'separate' && count > 0) {
+        const method = elements.downloadMethod().value;
+        if (method !== 'blob') {
+            alert('Separate file export works with "Blob URL (Default)" only. Switch the method selector and try again.');
+            return;
+        }
+        appState.batchData.forEach((file, index) => {
+            const data = buildExportRows(file.transactions);
+            downloadData(data, buildParsedExportName(file, index), type);
+        });
+        return;
+    }
+    const data = buildExportRows(appState.masterTransactions, true);
     const baseName = count > 1 ? `Combined_Batch_${count}_Statements` : `Master_Batch_Export`;
     downloadData(data, baseName, type);
 }
 
-window.exportOne = (filename, type) => {
-    const file = appState.batchData.find(d => d.filename === filename);
+window.exportOne = (fileId, type) => {
+    const file = appState.batchData.find(d => d.id === fileId);
     if (!file) return;
-    const data = file.transactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
-        if (appState.splitCode) {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Code)": details2, 
-                "Details 3 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance 
-            };
-        } else {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance 
-            };
-        }
-    });
-    downloadData(data, `${filename.replace('.pdf', '')}_Parsed`, type);
+    const data = buildExportRows(file.transactions);
+    downloadData(data, buildParsedExportName(file), type);
 };
 
 function downloadData(data, name, type) {

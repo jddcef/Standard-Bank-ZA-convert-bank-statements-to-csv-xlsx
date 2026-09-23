@@ -39,13 +39,15 @@
                 <button id="addFiles" class="btn-primary" style="margin-top: 1rem;">
                     <i data-lucide="plus-circle"></i> Add More PDFs
                 </button>
-                <button id="btnStartOverSidebar" class="btn-secondary btn-start-over" style="margin-top: 0.5rem; width: 100%;">
-                    <i data-lucide="rotate-ccw"></i> Start Over
-                </button>
             </div>
 
             <div class="sidebar-section">
-                <h3>Jump to File</h3>
+                <div class="sidebar-section-header">
+                    <h3>Jump to File</h3>
+                    <button id="btnStartOverSidebar" class="btn-secondary btn-sm btn-start-over btn-inline-control" type="button">
+                        <i data-lucide="rotate-ccw"></i> Start Over
+                    </button>
+                </div>
                 <div id="dashboard" class="file-list"></div>
             </div>
 
@@ -75,8 +77,8 @@
         <section id="resultsArea" class="hidden">
             <div class="tabs">
                 <button class="tab-btn active" data-tab="parsed">Master Table</button>
-                <button class="tab-btn" data-tab="raw">Raw Batch Feed</button>
-                <button class="tab-btn" data-tab="exclusions">Filters Log</button>
+                <button class="tab-btn tab-btn-debug debug-tab-start" data-tab="raw" aria-label="Debug tab: Raw Feed"><span class="tab-chip">Debug</span> Raw Feed</button>
+                <button class="tab-btn tab-btn-debug" data-tab="exclusions" aria-label="Debug tab: Filters Log"><span class="tab-chip">Debug</span> Filters Log</button>
             </div>
 
             <div class="tab-content active" id="tab-parsed">
@@ -89,14 +91,23 @@
                     <div style="display: flex; gap: 0.75rem; align-items: center;">
                         <button id="exportMasterCsv" class="btn-download btn-download-csv btn-sm" style="width:auto; margin:0;"><i data-lucide="download"></i> Download CSV</button>
                         <button id="exportMasterXlsx" class="btn-download btn-download-xlsx btn-sm" style="width:auto; margin:0;"><i data-lucide="file-spreadsheet"></i> Download XLSX</button>
-                        <div class="export-method-wrapper" style="display: flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; border-left: 1px solid var(--border-color); padding-left: 0.75rem;">
-                            <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="cog" style="width:12px;height:12px;vertical-align:middle;"></i> Method:</span>
+                        <div class="export-method-wrapper" style="display: flex; align-items: center; gap: 0.75rem; margin-left: 0.5rem; border-left: 1px solid var(--border-color); padding-left: 0.75rem; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="layers-3" style="width:12px;height:12px;vertical-align:middle;"></i> Files:</span>
+                                <select id="downloadScope" class="export-method-select" title="Choose whether to export one combined batch or separate files" aria-label="Export file grouping">
+                                    <option value="combined">Combined</option>
+                                    <option value="separate">Separate files</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.35rem;">
+                                <span style="font-size: 0.75rem; color: var(--text-muted);"><i data-lucide="cog" style="width:12px;height:12px;vertical-align:middle;"></i> Method:</span>
                             <select id="downloadMethod" class="export-method-select" title="Export delivery mechanism">
                                 <option value="blob">Blob URL (Default)</option>
                                 <option value="dataurl">Data URL</option>
                                 <option value="clipboard">Clipboard</option>
                                 <option value="show">Text Preview</option>
                             </select>
+                            </div>
                         </div>
                     </div>
                 </div>
