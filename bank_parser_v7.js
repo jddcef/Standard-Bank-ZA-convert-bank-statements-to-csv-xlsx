@@ -1019,8 +1019,15 @@ function removeFileFromSession(fileId) {
     appState.batchData = nextBatchData;
     applyBatchFilters();
     if (!appState.batchData.length) {
+        appState.masterTransactions = [];
+        appState.masterExclusions = [];
+        appState.lastTotalErrors = 0;
         elements.resultsArea().classList.add('hidden');
         elements.dropZone().classList.remove('hidden');
+        elements.fileCount().textContent = '0';
+        elements.txnCount().textContent = '0';
+        elements.batchStatus().textContent = 'Ready';
+        updateDownloadButtons();
     }
 }
 
@@ -1433,14 +1440,19 @@ function updateDownloadButtons() {
     const countSuffix = count > 1 ? ` (${count})` : '';
     const csvBtn = document.getElementById('exportMasterCsv');
     const xlsxBtn = document.getElementById('exportMasterXlsx');
-    const csvLabel = scope === 'separate' && count > 1 ? `Download CSV Files${countSuffix}` : `Download CSV${countSuffix}`;
-    const xlsxLabel = scope === 'separate' && count > 1 ? `Download XLSX Files${countSuffix}` : `Download XLSX${countSuffix}`;
+    const csvLabel = scope === 'separate'
+        ? `Download CSV ${count === 1 ? 'File' : 'Files'}${countSuffix}`
+        : `Download CSV${countSuffix}`;
+    const xlsxLabel = scope === 'separate'
+        ? `Download XLSX ${count === 1 ? 'File' : 'Files'}${countSuffix}`
+        : `Download XLSX${countSuffix}`;
     if (csvBtn) {
         csvBtn.innerHTML = `<i data-lucide="download"></i> ${csvLabel}`;
     }
     if (xlsxBtn) {
         xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> ${xlsxLabel}`;
     }
+    refreshIcons();
 }
 
 window.toggleCodeSplit = () => {
@@ -1462,7 +1474,7 @@ window.jumpToFile = (id) => {
 function exportAll(type) {
     const count = appState.batchData ? appState.batchData.length : 0;
     const scope = elements.downloadScope ? elements.downloadScope()?.value : 'combined';
-    if (scope === 'separate' && count > 1) {
+    if (scope === 'separate' && count > 0) {
         const method = elements.downloadMethod().value;
         if (method === 'clipboard' || method === 'show') {
             alert('Separate file export works with "Blob URL (Default)" or "Data URL". Switch the method selector and try again.');
