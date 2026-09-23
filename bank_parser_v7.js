@@ -34,6 +34,7 @@ let appState = {
     lastTotalErrors: 0,
     masterTransactions: [],
     masterExclusions: [],
+    nextBatchFileId: 1,
     lastPdfPassword: '',
     pendingPasswordRequest: null,
     resumeLoaderText: ''
@@ -540,6 +541,7 @@ async function processFiles(files) {
             showLoader(`Parsing ${file.name}...`);
             const parsed = await parsePdf(file);
             appState.batchData.push({ 
+                id: `batch-file-${appState.nextBatchFileId++}`,
                 filename: file.name, size: file.size, 
                 rawPages: parsed.rawPages, // Raw in-memory page store for instant split-method updating!
                 lines: [], 
@@ -1001,6 +1003,9 @@ function applyBatchFilters() {
 
         fileData.errorCount = performFileSanity(fileData);
         totalErrors += fileData.errorCount;
+        fileData.transactions.forEach(t => {
+            t.sourceFileId = fileData.id;
+        });
         appState.masterTransactions.push(...fileData.transactions);
         appState.masterExclusions.push(...fileData.exclusions);
     });
@@ -1008,8 +1013,8 @@ function applyBatchFilters() {
     renderAll(totalErrors);
 }
 
-function removeFileFromSession(filename) {
-    const nextBatchData = appState.batchData.filter(file => file.filename !== filename);
+function removeFileFromSession(fileId) {
+    const nextBatchData = appState.batchData.filter(file => file.id !== fileId);
     if (nextBatchData.length === appState.batchData.length) return;
     appState.batchData = nextBatchData;
     applyBatchFilters();
@@ -1045,6 +1050,14 @@ function buildExportRows(transactions, includeSource = false) {
         if (includeSource) row.Source = t.source;
         return row;
     });
+}
+
+function buildParsedExportName(file, index = null) {
+    const baseName = (file.filename || 'Statement').replace(/\.pdf$/i, '') || 'Statement';
+    if (index === null || index === undefined) {
+        return `${baseName}_Parsed`;
+    }
+    return `${String(index + 1).padStart(2, '0')}_${baseName}_Parsed`;
 }
 
 function getCategory(details) {
@@ -1266,13 +1279,13 @@ function renderAll(totalErrors) {
         // 2. Master Table Body
         const table = elements.txnTable();
         table.innerHTML = '';
-        let lastSource = null;
+        let lastSourceFileId = null;
 
         appState.masterTransactions.forEach(t => {
             const row = document.createElement('tr');
-            if (t.source !== lastSource) {
-                row.id = sanitizeId(t.source);
-                lastSource = t.source;
+            if (t.sourceFileId !== lastSourceFileId) {
+                row.id = t.sourceFileId || sanitizeId(t.source);
+                lastSourceFileId = t.sourceFileId;
             }
             const amtCls = parseFloat(t.amount) < 0 ? 'text-danger' : 'text-success';
             const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
@@ -1318,7 +1331,7 @@ function renderAll(totalErrors) {
         appState.batchData.forEach(file => {
             const item = document.createElement('div');
             item.className = 'file-item';
-            const fileId = sanitizeId(file.filename);
+            const fileId = file.id || sanitizeId(file.filename);
             const ccBadge = file.statementType === 'credit' 
                 ? '<span class="badge-statement-type cc">Credit Card</span>'
                 : (file.statementType === 'weekly'
@@ -1342,21 +1355,21 @@ function renderAll(totalErrors) {
             csvBtn.type = 'button';
             csvBtn.title = 'Download this file as CSV';
             csvBtn.innerHTML = '<i data-lucide="file-text" style="width:14px;"></i>';
-            csvBtn.onclick = () => window.exportOne(file.filename, 'csv');
+            csvBtn.onclick = () => window.exportOne(fileId, 'csv');
 
             const xlsxBtn = document.createElement('button');
             xlsxBtn.className = 'icon-btn';
             xlsxBtn.type = 'button';
             xlsxBtn.title = 'Download this file as XLSX';
             xlsxBtn.innerHTML = '<i data-lucide="file-spreadsheet" style="width:14px;"></i>';
-            xlsxBtn.onclick = () => window.exportOne(file.filename, 'xlsx');
+            xlsxBtn.onclick = () => window.exportOne(fileId, 'xlsx');
 
             const removeBtn = document.createElement('button');
             removeBtn.className = 'icon-btn file-action-remove';
             removeBtn.type = 'button';
             removeBtn.title = 'Remove from current session';
             removeBtn.innerHTML = '<i data-lucide="x" style="width:14px;"></i>';
-            removeBtn.onclick = () => removeFileFromSession(file.filename);
+            removeBtn.onclick = () => removeFileFromSession(fileId);
 
             actions.append(csvBtn, xlsxBtn, removeBtn);
             header.append(fileName, actions);
@@ -1452,12 +1465,12 @@ function exportAll(type) {
     if (scope === 'separate' && count > 1) {
         const method = elements.downloadMethod().value;
         if (method === 'clipboard' || method === 'show') {
-            alert('Separate file export works with Blob URL or Data URL downloads. Switch the export method and try again.');
+            alert('Separate file export works with "Blob URL (Default)" or "Data URL". Switch the method selector and try again.');
             return;
         }
-        appState.batchData.forEach(file => {
+        appState.batchData.forEach((file, index) => {
             const data = buildExportRows(file.transactions);
-            downloadData(data, `${file.filename.replace('.pdf', '')}_Parsed`, type);
+            downloadData(data, buildParsedExportName(file, index), type);
         });
         return;
     }
@@ -1466,11 +1479,11 @@ function exportAll(type) {
     downloadData(data, baseName, type);
 }
 
-window.exportOne = (filename, type) => {
-    const file = appState.batchData.find(d => d.filename === filename);
+window.exportOne = (fileId, type) => {
+    const file = appState.batchData.find(d => d.id === fileId);
     if (!file) return;
     const data = buildExportRows(file.transactions);
-    downloadData(data, `${filename.replace('.pdf', '')}_Parsed`, type);
+    downloadData(data, buildParsedExportName(file), type);
 };
 
 function downloadData(data, name, type) {
