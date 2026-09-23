@@ -1025,6 +1025,9 @@ function removeFileFromSession(fileId) {
         elements.resultsArea().classList.add('hidden');
         elements.dropZone().classList.remove('hidden');
         elements.dashboard().innerHTML = '';
+        elements.txnTable().innerHTML = '';
+        elements.rawOutput().innerHTML = '';
+        elements.exclusionTable().innerHTML = '';
         elements.fileCount().textContent = '0';
         elements.txnCount().textContent = '0';
         elements.batchStatus().textContent = 'Ready';
@@ -1482,8 +1485,8 @@ function exportAll(type) {
     const scope = getDownloadScope();
     if (scope === 'separate' && count > 0) {
         const method = elements.downloadMethod().value;
-        if (method === 'clipboard' || method === 'show') {
-            alert('Separate file export works with "Blob URL (Default)" or "Data URL". Switch the method selector and try again.');
+        if (method !== 'blob') {
+            alert('Separate file export works with "Blob URL (Default)" only. Switch the method selector and try again.');
             return;
         }
         appState.batchData.forEach((file, index) => {
