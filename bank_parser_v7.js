@@ -140,6 +140,7 @@ const elements = {
     textModalArea: () => document.getElementById('textModalArea'),
     copyTextModal: () => document.getElementById('copyTextModal'),
     closeTextModal: () => document.getElementById('closeTextModal'),
+    downloadScope: () => document.getElementById('downloadScope'),
     downloadMethod: () => document.getElementById('downloadMethod'),
     splitMethodSelect: () => document.getElementById('splitMethodSelect'),
     splitXInput: () => document.getElementById('splitXInput'),
@@ -323,10 +324,18 @@ function setupEvents() {
     elements.addFiles().onclick = () => elements.fileInput().click();
     document.getElementById('closeLoader').onclick = () => hideLoader();
     
-    elements.fileInput().onchange = e => e.target.files.length && processFiles(Array.from(e.target.files));
+    elements.fileInput().onchange = e => {
+        if (!e.target.files.length) return;
+        const files = Array.from(e.target.files);
+        e.target.value = '';
+        processFiles(files);
+    };
     elements.dropZone().ondragover = e => { e.preventDefault(); elements.dropZone().classList.add('active'); };
     elements.dropZone().ondragleave = () => elements.dropZone().classList.remove('active');
     elements.dropZone().ondrop = e => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); };
+    if (elements.downloadScope()) {
+        elements.downloadScope().onchange = () => updateDownloadButtons();
+    }
 
     elements.toggles().forEach(t => {
         const input = t.querySelector('input');
@@ -999,6 +1008,45 @@ function applyBatchFilters() {
     renderAll(totalErrors);
 }
 
+function removeFileFromSession(filename) {
+    const nextBatchData = appState.batchData.filter(file => file.filename !== filename);
+    if (nextBatchData.length === appState.batchData.length) return;
+    appState.batchData = nextBatchData;
+    applyBatchFilters();
+    if (!appState.batchData.length) {
+        elements.resultsArea().classList.add('hidden');
+        elements.dropZone().classList.remove('hidden');
+    }
+}
+
+function buildExportRows(transactions, includeSource = false) {
+    return transactions.map(t => {
+        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
+        const row = appState.splitCode
+            ? {
+                Date: t.date,
+                Year: t.year || "",
+                "Details 1 (Type)": details1,
+                "Details 2 (Code)": details2,
+                "Details 3 (Additional)": details3,
+                Category: t.category,
+                Amount: t.amount,
+                Balance: t.balance
+            }
+            : {
+                Date: t.date,
+                Year: t.year || "",
+                "Details 1 (Type)": details1,
+                "Details 2 (Additional)": details3,
+                Category: t.category,
+                Amount: t.amount,
+                Balance: t.balance
+            };
+        if (includeSource) row.Source = t.source;
+        return row;
+    });
+}
+
 function getCategory(details) {
     for (let catRule of appState.categories) {
         const parts = catRule.split(':');
@@ -1276,25 +1324,61 @@ function renderAll(totalErrors) {
                 : (file.statementType === 'weekly'
                     ? '<span class="badge-statement-type weekly">Weekly Statement</span>'
                     : '<span class="badge-statement-type current">Current Account</span>');
-                
-            item.innerHTML = `
-                <div class="file-item-header">
-                    <span class="file-name clickable" onclick="jumpToFile('${fileId}')" title="Jump to this file">${file.filename}</span>
-                    <div class="file-actions">
-                        <button class="icon-btn" onclick="exportOne('${file.filename}', 'csv')"><i data-lucide="file-text" style="width:14px;"></i></button>
-                        <button class="icon-btn" onclick="exportOne('${file.filename}', 'xlsx')"><i data-lucide="file-spreadsheet" style="width:14px;"></i></button>
-                    </div>
-                </div>
-                <div class="file-metadata" style="margin-top: 4px; color: var(--text-secondary); font-size: 0.7rem; display: flex; flex-direction: column; gap: 2px;">
-                    ${file.statementNo ? `<span>Statement No: <strong>${file.statementNo}</strong></span>` : ''}
-                    <span>Period: <strong>${file.periodText}</strong></span>
-                    ${ccBadge}
-                </div>
-                <div class="file-stats" style="margin-top: 6px;">
-                    <span>${file.transactions.length} rows</span>
-                    <span class="file-badge ${file.errorCount > 0 ? 'err' : 'ok'}">${file.errorCount > 0 ? file.errorCount + ' Errors' : 'Verified'}</span>
-                </div>
+
+            const header = document.createElement('div');
+            header.className = 'file-item-header';
+
+            const fileName = document.createElement('span');
+            fileName.className = 'file-name clickable';
+            fileName.title = 'Jump to this file';
+            fileName.textContent = file.filename;
+            fileName.onclick = () => window.jumpToFile(fileId);
+
+            const actions = document.createElement('div');
+            actions.className = 'file-actions';
+
+            const csvBtn = document.createElement('button');
+            csvBtn.className = 'icon-btn';
+            csvBtn.type = 'button';
+            csvBtn.title = 'Download this file as CSV';
+            csvBtn.innerHTML = '<i data-lucide="file-text" style="width:14px;"></i>';
+            csvBtn.onclick = () => window.exportOne(file.filename, 'csv');
+
+            const xlsxBtn = document.createElement('button');
+            xlsxBtn.className = 'icon-btn';
+            xlsxBtn.type = 'button';
+            xlsxBtn.title = 'Download this file as XLSX';
+            xlsxBtn.innerHTML = '<i data-lucide="file-spreadsheet" style="width:14px;"></i>';
+            xlsxBtn.onclick = () => window.exportOne(file.filename, 'xlsx');
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'icon-btn file-action-remove';
+            removeBtn.type = 'button';
+            removeBtn.title = 'Remove from current session';
+            removeBtn.innerHTML = '<i data-lucide="x" style="width:14px;"></i>';
+            removeBtn.onclick = () => removeFileFromSession(file.filename);
+
+            actions.append(csvBtn, xlsxBtn, removeBtn);
+            header.append(fileName, actions);
+
+            const metadata = document.createElement('div');
+            metadata.className = 'file-metadata';
+            metadata.style.cssText = 'margin-top: 4px; color: var(--text-secondary); font-size: 0.7rem; display: flex; flex-direction: column; gap: 2px;';
+            metadata.innerHTML = `
+                ${file.statementNo ? `<span>Statement No: <strong>${file.statementNo}</strong></span>` : ''}
+                <span>Period: <strong>${file.periodText}</strong></span>
+                ${ccBadge}
             `;
+
+            const stats = document.createElement('div');
+            stats.className = 'file-stats';
+            stats.style.marginTop = '6px';
+            stats.innerHTML = `
+                <span>${file.transactions.length} rows</span>
+                <span class="file-badge ${file.errorCount > 0 ? 'err' : 'ok'}">${file.errorCount > 0 ? file.errorCount + ' Errors' : 'Verified'}</span>
+            `;
+
+            item.append(header, metadata, stats);
             dashboard.appendChild(item);
         });
 
@@ -1332,14 +1416,17 @@ function renderAll(totalErrors) {
 
 function updateDownloadButtons() {
     const count = appState.batchData ? appState.batchData.length : 0;
+    const scope = elements.downloadScope ? elements.downloadScope()?.value : 'combined';
     const countSuffix = count > 1 ? ` (${count})` : '';
     const csvBtn = document.getElementById('exportMasterCsv');
     const xlsxBtn = document.getElementById('exportMasterXlsx');
+    const csvLabel = scope === 'separate' && count > 1 ? `Download CSV Files${countSuffix}` : `Download CSV${countSuffix}`;
+    const xlsxLabel = scope === 'separate' && count > 1 ? `Download XLSX Files${countSuffix}` : `Download XLSX${countSuffix}`;
     if (csvBtn) {
-        csvBtn.innerHTML = `<i data-lucide="download"></i> Download CSV${countSuffix}`;
+        csvBtn.innerHTML = `<i data-lucide="download"></i> ${csvLabel}`;
     }
     if (xlsxBtn) {
-        xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> Download XLSX${countSuffix}`;
+        xlsxBtn.innerHTML = `<i data-lucide="file-spreadsheet"></i> ${xlsxLabel}`;
     }
 }
 
@@ -1360,34 +1447,21 @@ window.jumpToFile = (id) => {
 };
 
 function exportAll(type) {
-    const data = appState.masterTransactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
-        if (appState.splitCode) {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Code)": details2, 
-                "Details 3 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance, 
-                Source: t.source 
-            };
-        } else {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance, 
-                Source: t.source 
-            };
-        }
-    });
     const count = appState.batchData ? appState.batchData.length : 0;
+    const scope = elements.downloadScope ? elements.downloadScope()?.value : 'combined';
+    if (scope === 'separate' && count > 1) {
+        const method = elements.downloadMethod().value;
+        if (method === 'clipboard' || method === 'show') {
+            alert('Separate file export works with Blob URL or Data URL downloads. Switch the export method and try again.');
+            return;
+        }
+        appState.batchData.forEach(file => {
+            const data = buildExportRows(file.transactions);
+            downloadData(data, `${file.filename.replace('.pdf', '')}_Parsed`, type);
+        });
+        return;
+    }
+    const data = buildExportRows(appState.masterTransactions, true);
     const baseName = count > 1 ? `Combined_Batch_${count}_Statements` : `Master_Batch_Export`;
     downloadData(data, baseName, type);
 }
@@ -1395,31 +1469,7 @@ function exportAll(type) {
 window.exportOne = (filename, type) => {
     const file = appState.batchData.find(d => d.filename === filename);
     if (!file) return;
-    const data = file.transactions.map(t => {
-        const { details1, details2, details3 } = splitDetails(t.details, appState.splitCode);
-        if (appState.splitCode) {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Code)": details2, 
-                "Details 3 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance 
-            };
-        } else {
-            return { 
-                Date: t.date, 
-                Year: t.year || "",
-                "Details 1 (Type)": details1, 
-                "Details 2 (Additional)": details3, 
-                Category: t.category, 
-                Amount: t.amount, 
-                Balance: t.balance 
-            };
-        }
-    });
+    const data = buildExportRows(file.transactions);
     downloadData(data, `${filename.replace('.pdf', '')}_Parsed`, type);
 };
 
