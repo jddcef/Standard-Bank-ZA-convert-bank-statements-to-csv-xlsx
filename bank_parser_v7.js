@@ -1024,6 +1024,7 @@ function removeFileFromSession(fileId) {
         appState.lastTotalErrors = 0;
         elements.resultsArea().classList.add('hidden');
         elements.dropZone().classList.remove('hidden');
+        elements.dashboard().innerHTML = '';
         elements.fileCount().textContent = '0';
         elements.txnCount().textContent = '0';
         elements.batchStatus().textContent = 'Ready';
@@ -1065,6 +1066,11 @@ function buildParsedExportName(file, index = null) {
         return `${baseName}_Parsed`;
     }
     return `${String(index + 1).padStart(2, '0')}_${baseName}_Parsed`;
+}
+
+function getDownloadScope() {
+    const scopeSelect = elements.downloadScope();
+    return scopeSelect ? scopeSelect.value : 'combined';
 }
 
 function getCategory(details) {
@@ -1436,7 +1442,7 @@ function renderAll(totalErrors) {
 
 function updateDownloadButtons() {
     const count = appState.batchData ? appState.batchData.length : 0;
-    const scope = elements.downloadScope ? elements.downloadScope()?.value : 'combined';
+    const scope = getDownloadScope();
     const countSuffix = count > 1 ? ` (${count})` : '';
     const csvBtn = document.getElementById('exportMasterCsv');
     const xlsxBtn = document.getElementById('exportMasterXlsx');
@@ -1473,7 +1479,7 @@ window.jumpToFile = (id) => {
 
 function exportAll(type) {
     const count = appState.batchData ? appState.batchData.length : 0;
-    const scope = elements.downloadScope ? elements.downloadScope()?.value : 'combined';
+    const scope = getDownloadScope();
     if (scope === 'separate' && count > 0) {
         const method = elements.downloadMethod().value;
         if (method === 'clipboard' || method === 'show') {
