@@ -316,6 +316,7 @@ function init() {
     elements.customXContainer().style.display = appState.splitMethod === 'custom' ? 'block' : 'none';
     
     setupEvents();
+    syncDownloadMethodForScope();
     updateDownloadButtons();
     refreshIcons();
 }
@@ -335,7 +336,10 @@ function setupEvents() {
     elements.dropZone().ondragleave = () => elements.dropZone().classList.remove('active');
     elements.dropZone().ondrop = e => { e.preventDefault(); processFiles(Array.from(e.dataTransfer.files)); };
     if (elements.downloadScope()) {
-        elements.downloadScope().onchange = () => updateDownloadButtons();
+        elements.downloadScope().onchange = () => {
+            syncDownloadMethodForScope();
+            updateDownloadButtons();
+        };
     }
 
     elements.toggles().forEach(t => {
@@ -1019,19 +1023,7 @@ function removeFileFromSession(fileId) {
     appState.batchData = nextBatchData;
     applyBatchFilters();
     if (!appState.batchData.length) {
-        appState.masterTransactions = [];
-        appState.masterExclusions = [];
-        appState.lastTotalErrors = 0;
-        elements.resultsArea().classList.add('hidden');
-        elements.dropZone().classList.remove('hidden');
-        elements.dashboard().innerHTML = '';
-        elements.txnTable().innerHTML = '';
-        elements.rawOutput().innerHTML = '';
-        elements.exclusionTable().innerHTML = '';
-        elements.fileCount().textContent = '0';
-        elements.txnCount().textContent = '0';
-        elements.batchStatus().textContent = 'Ready';
-        updateDownloadButtons();
+        resetSessionUi();
     }
 }
 
@@ -1074,6 +1066,41 @@ function buildParsedExportName(file, index = null) {
 function getDownloadScope() {
     const scopeSelect = elements.downloadScope();
     return scopeSelect ? scopeSelect.value : 'combined';
+}
+
+function syncDownloadMethodForScope() {
+    const scope = getDownloadScope();
+    const methodSelect = elements.downloadMethod();
+    if (!methodSelect) return;
+    const separateMode = scope === 'separate';
+    Array.from(methodSelect.options).forEach(option => {
+        option.disabled = separateMode && option.value !== 'blob';
+    });
+    if (separateMode && methodSelect.value !== 'blob') {
+        methodSelect.value = 'blob';
+    }
+    methodSelect.title = separateMode
+        ? 'Separate file exports use Blob URL downloads'
+        : 'Export delivery mechanism';
+}
+
+function resetSessionUi() {
+    appState.masterTransactions = [];
+    appState.masterExclusions = [];
+    appState.lastTotalErrors = 0;
+    elements.resultsArea().classList.add('hidden');
+    elements.dropZone().classList.remove('hidden');
+    elements.dashboard().innerHTML = '';
+    elements.txnTable().innerHTML = '';
+    elements.rawOutput().innerHTML = '';
+    elements.exclusionTable().innerHTML = '';
+    elements.fileCount().textContent = '0';
+    elements.txnCount().textContent = '0';
+    elements.batchStatus().textContent = 'Ready';
+    const parsedTab = document.querySelector('.tab-btn[data-tab="parsed"]');
+    if (parsedTab) parsedTab.click();
+    syncDownloadMethodForScope();
+    updateDownloadButtons();
 }
 
 function getCategory(details) {
