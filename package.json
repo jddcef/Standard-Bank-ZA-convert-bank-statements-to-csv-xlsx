@@ -1,0 +1,22 @@
+{
+  "name": "standard-bank-statement-converter",
+  "version": "7.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-side Standard Bank (ZA) PDF statement to CSV/XLSX converter, with a Node test harness over real anonymised PDF fixtures.",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:watch": "node --test --watch \"test/**/*.test.js\"",
+    "fixtures:build": "node test/helpers/build-fixtures.js",
+    "fixtures:list": "node test/helpers/build-fixtures.js --list",
+    "anonymise": "node tools/anonymise-pdf.js"
+  },
+  "devDependencies": {
+    "jsdom": "^25.0.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "3.11.174"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,1 +1,8 @@
 /.agents
+node_modules/
+
+# Un-anonymised bank statements. Never commit these; only the redacted
+# derivatives in test/fixtures/pdfs belong in the repository.
+test/fixtures/originals/
+test/fixtures/derived/
+
