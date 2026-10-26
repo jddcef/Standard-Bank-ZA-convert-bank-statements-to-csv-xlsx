@@ -1,0 +1,7 @@
+{
+  "name": "standard-bank-za-convert-bank-statements-to-csv-xlsx",
+  "private": true,
+  "scripts": {
+    "test": "node --test"
+  }
+}
