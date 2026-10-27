@@ -1,10 +1,4 @@
 {
-<<<<<<< HEAD
-  "name": "standard-bank-za-convert-bank-statements-to-csv-xlsx",
-  "private": true,
-  "scripts": {
-    "test": "node --test"
-=======
   "name": "standard-bank-statement-converter",
   "version": "7.0.0",
   "private": true,
@@ -24,6 +18,5 @@
   },
   "engines": {
     "node": ">=20"
->>>>>>> origin/main
   }
 }

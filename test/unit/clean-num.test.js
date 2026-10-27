@@ -48,16 +48,23 @@ describe('cleanNum', () => {
         assert.equal(cleanNum('R1,234.56'), '1234.56');
     });
 
-    test('integers without a decimal part are preserved', () => {
-                assert.equal(cleanNum('1000'), '1000');
-                assert.equal(cleanNum('5'), '5');
+    test('preserves South African spaced values and comma decimals', () => {
+        assert.equal(cleanNum('1 234,50'), '1234.50');
+        assert.equal(cleanNum('-1 234,50'), '-1234.50');
+        assert.equal(cleanNum('1.234,50'), '1234.50');
+        assert.equal(cleanNum('10 000.00'), '10000.00');
+    });
 
-                // A separator exactly 3 characters from the end is always read as a
-                // thousands separator. '1,000' has its comma at index 1, not 2, so no
-                // split happens at all and every separator is simply dropped.
-                assert.equal(cleanNum('1,000'), '1000');
-                assert.equal(cleanNum('1,000.00'), '1000.00');
-                // Same trap for European-style grouping of a 4-digit integer.
-                assert.equal(cleanNum('1.000'), '1000');
+    test('integers without a decimal part are preserved', () => {
+        assert.equal(cleanNum('1000'), '1000');
+        assert.equal(cleanNum('5'), '5');
+
+        // A separator exactly 3 characters from the end is always read as a
+        // thousands separator. '1,000' has its comma at index 1, not 2, so no
+        // split happens at all and every separator is simply dropped.
+        assert.equal(cleanNum('1,000'), '1000');
+        assert.equal(cleanNum('1,000.00'), '1000.00');
+        // Same trap for European-style grouping of a 4-digit integer.
+        assert.equal(cleanNum('1.000'), '1000');
     });
 });
